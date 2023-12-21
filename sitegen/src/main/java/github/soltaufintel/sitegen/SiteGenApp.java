@@ -88,7 +88,7 @@ public class SiteGenApp {
 	private String removeComments(String markdown) {
 		String ret = "";
 		for (String line : markdown.replace("\r\n", "\n").split("\n")) {
-			if (!line.trim().startsWith("//")) {
+			if (!line.startsWith("//")) {
 				ret += line + "\n";
 			}
 		}
@@ -117,6 +117,9 @@ public class SiteGenApp {
         String c = readFile("../toc");
         boolean first = true;
         for (String line : c.replace("\r\n", "\n").split("\n")) {
+        	if (line.trim().startsWith("//")) {
+        		continue;
+        	}
             int o = line.indexOf("\"");
             int oo = line.indexOf("\"", o + 1);
             if (o >= 0 && oo > o) {
