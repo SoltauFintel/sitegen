@@ -78,12 +78,22 @@ public class SiteGenApp {
     }
 
     private String markdown2html(String markdown) {
+    	markdown = removeComments(markdown);
     	Parser parser = Parser.builder().build();
     	Node document = parser.parse(markdown);
     	HtmlRenderer renderer = HtmlRenderer.builder().build();
     	return renderer.render(document);
 	}
     
+	private String removeComments(String markdown) {
+		String ret = "";
+		for (String line : markdown.replace("\r\n", "\n").split("\n")) {
+			if (!line.trim().startsWith("//")) {
+				ret += line + "\n";
+			}
+		}
+		return ret.replace("TODO", "<span style=\"color: red; font-weight: bold;\">TODO</span>");
+	}
 	private String shortFilename(String filename) {
 		int o = filename.lastIndexOf(".");
 		if (o >= 0) {
@@ -114,7 +124,7 @@ public class SiteGenApp {
                 String file = line.substring(oo + 1).trim();
                 DataMap map = list.add();
                 map.put("title", title);
-                map.put("link", file + ".html");
+                map.put("link", file.startsWith("http") ? file : file + ".html");
                 map.put("isSection", file.isEmpty());
                 map.put("isFirst", first);
                 first = false;
