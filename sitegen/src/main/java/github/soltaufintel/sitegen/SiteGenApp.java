@@ -67,9 +67,14 @@ public class SiteGenApp {
     		html = "{{master: master_doc}}\n\n" + markdown2html(html);
     	}
         model.put("title", extractTitle(shortFilename(filename), html));
-		String out = compiler.compile(html).render(model);
-        write(new File(dir, "../out/" + shortFilename(filename) + ".html"), out);
-        System.out.println("- " + filename);
+		try {
+			String out = compiler.compile(html).render(model);
+			out = out.replace("LBRACELBRACE", "{{");
+			write(new File(dir, "../out/" + shortFilename(filename) + ".html"), out);
+			System.out.println("- " + filename);
+		} catch (Exception e) {
+			throw new RuntimeException("Error rendering file " + filename + "\n" + e.getMessage(), e);
+		}
     }
 
     private String markdown2html(String markdown) {
@@ -100,6 +105,7 @@ public class SiteGenApp {
 
     private void readTOC(DataList list) {
         String c = readFile("../toc");
+        boolean first = true;
         for (String line : c.replace("\r\n", "\n").split("\n")) {
             int o = line.indexOf("\"");
             int oo = line.indexOf("\"", o + 1);
@@ -110,6 +116,8 @@ public class SiteGenApp {
                 map.put("title", title);
                 map.put("link", file + ".html");
                 map.put("isSection", file.isEmpty());
+                map.put("isFirst", first);
+                first = false;
             }
         }
     }
