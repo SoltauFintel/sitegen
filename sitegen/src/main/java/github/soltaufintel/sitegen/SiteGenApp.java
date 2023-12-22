@@ -4,10 +4,12 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 
-import com.github.template72.compiler.CompiledTemplates;
+import org.commonmark.node.Node;
+import org.commonmark.parser.Parser;
+import org.commonmark.renderer.html.HtmlRenderer;
+
 import com.github.template72.compiler.TemplateCompiler;
 import com.github.template72.compiler.TemplateCompilerBuilder;
 import com.github.template72.data.DataList;
@@ -16,16 +18,23 @@ import com.github.template72.loader.TemplateLoader;
 
 public class SiteGenApp {
     private String dir;
-    private CompiledTemplates templates;
+    private TemplateCompiler compiler;
 
     public static void main(String[] args) {
         new SiteGenApp().start(args[0]);
+        System.out.println("\nfinished");
     }
-
     public void start(String dir) {
         this.dir = dir;
-        System.out.println("work dir: " + new File(dir).getAbsolutePath());
-        TemplateCompiler compiler = new TemplateCompilerBuilder().withLoader(new TemplateLoader() {
+        System.out.println("work dir: " + new File(dir).getAbsolutePath() + "\n");
+        File outDir = new File(dir, "../out");
+		outDir.mkdirs();
+        for (File file0 : outDir.listFiles()) {
+        	if (file0.getName().endsWith(".html")) {
+        		file0.delete();
+        	}
+        }
+        compiler = new TemplateCompilerBuilder().withLoader(new TemplateLoader() {
             @Override
             public String loadTemplate(String filename) {
                 try {
@@ -39,61 +48,78 @@ public class SiteGenApp {
             public void setParentLoader(TemplateLoader parentLoader) {
             }
         }).build();
-        templates = new CompiledTemplates(compiler, null, true);
+		compiler.setFirstLoader(null);
 
         DataMap model = new DataMap();
         readTOC(model.list("toc"));
         readVars(model);
         for (File file : new File(dir, "templates").listFiles()) {
-            String name = file.getName().replace(".html", "");
-            if (name.startsWith("master") || name.startsWith("menu")) {
-            } else {
-                render(name, model);
+            String name = shortFilename(file.getName());
+            if (!name.startsWith("master") && !name.startsWith("menu")) {
+                render(file.getName(), model);
             }
         }
     }
 
     private void render(String filename, DataMap model) {
-        model.put("title", readTitle(filename));
-        String out = templates.render(filename, model);
-        write(new File(dir, "../out/" + filename + ".html"), out);
-        System.out.println(filename);
+    	String html = readFile(filename);
+    	if (filename.endsWith(".md")) {
+    		html = "{{master: master_doc}}\n\n" + markdown2html(html);
+    	}
+        model.put("title", extractTitle(shortFilename(filename), html));
+		try {
+			String out = compiler.compile(html).render(model);
+			out = out.replace("LBRACELBRACE", "{{");
+			write(new File(dir, "../out/" + shortFilename(filename) + ".html"), out);
+			System.out.println("- " + filename);
+		} catch (Exception e) {
+			throw new RuntimeException("Error rendering file " + filename + "\n" + e.getMessage(), e);
+		}
     }
 
-    private void write(File file, String text) {
-        file.getParentFile().mkdirs();
-        try (FileWriter w = new FileWriter(file)) {
-            w.write(text);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
+    private String markdown2html(String markdown) {
+    	markdown = removeComments(markdown);
+    	Parser parser = Parser.builder().build();
+    	Node document = parser.parse(markdown);
+    	HtmlRenderer renderer = HtmlRenderer.builder().build();
+    	return renderer.render(document);
+	}
+    
+	private String removeComments(String markdown) {
+		String ret = "";
+		for (String line : markdown.replace("\r\n", "\n").split("\n")) {
+			if (!line.startsWith("//")) {
+				ret += line + "\n";
+			}
+		}
+		return ret.replace("TODO", "<span style=\"color: red; font-weight: bold;\">TODO</span>");
+	}
+	private String shortFilename(String filename) {
+		int o = filename.lastIndexOf(".");
+		if (o >= 0) {
+			filename = filename.substring(0, o);
+		}
+		return filename;
+	}
 
-    private String readTitle(String filename) {
+    private String extractTitle(String filename, String html) {
         String title = filename;
-        String c;
-        try {
-            c = new String(Files.readAllBytes(Paths.get(dir + "/templates/" + filename + ".html")));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        int o = c.indexOf("<h1>");
+        int o = html.indexOf("<h1>");
         if (o >= 0) {
             o += "<h1>".length();
-            int oo = c.indexOf("</h1>", o);
-            title = c.substring(o, oo).trim();
+            int oo = html.indexOf("</h1>", o);
+            title = html.substring(o, oo).trim();
         }
         return title;
     }
 
     private void readTOC(DataList list) {
-        String c;
-        try {
-            c = new String(Files.readAllBytes(Paths.get(dir + "/toc")));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        String c = readFile("../toc");
+        boolean first = true;
         for (String line : c.replace("\r\n", "\n").split("\n")) {
+        	if (line.trim().startsWith("//")) {
+        		continue;
+        	}
             int o = line.indexOf("\"");
             int oo = line.indexOf("\"", o + 1);
             if (o >= 0 && oo > o) {
@@ -101,25 +127,38 @@ public class SiteGenApp {
                 String file = line.substring(oo + 1).trim();
                 DataMap map = list.add();
                 map.put("title", title);
-                map.put("link", file + ".html");
+                map.put("link", file.startsWith("http") ? file : file + ".html");
                 map.put("isSection", file.isEmpty());
+                map.put("isFirst", first);
+                first = false;
             }
         }
     }
 
     private void readVars(DataMap model) {
-        Path p = Paths.get(dir + "/vars");
-        if (!p.toFile().isFile()) {
-            return;
+        String c = readFile("../vars");
+        for (String line : c.replace("\r\n", "\n").split("\n")) {
+			int o = line.indexOf("=");
+			if (o >= 0) {
+				model.put(line.substring(0, o).trim(), line.substring(o + 1).trim());
+			}
         }
-        String c;
+    }
+    
+    private String readFile(String filename) {
+    	File file = new File(dir + "/templates/" + filename);
         try {
-            c = new String(Files.readAllBytes(p));
+            return new String(Files.readAllBytes(file.toPath()));
+        } catch (IOException e) {
+            throw new RuntimeException("Error reading file: " + file.getAbsolutePath(), e);
+        }
+    }
+
+	private void write(File file, String text) {
+        try (FileWriter w = new FileWriter(file)) {
+            w.write(text);
         } catch (IOException e) {
             throw new RuntimeException(e);
-        }
-        for (String line : c.replace("\r\n", "\n").split("\n")) {
-            model.put(line.substring(0, line.indexOf("=")), line.substring(line.indexOf("=") + 1));
         }
     }
 }
