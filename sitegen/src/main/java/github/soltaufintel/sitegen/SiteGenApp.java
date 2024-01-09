@@ -6,7 +6,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
+import java.util.List;
 
+import org.commonmark.Extension;
+import org.commonmark.ext.gfm.tables.TablesExtension;
 import org.commonmark.node.Node;
 import org.commonmark.parser.Parser;
 import org.commonmark.renderer.html.HtmlRenderer;
@@ -53,13 +57,12 @@ public class SiteGenApp {
                 System.err.println("ERROR " + file.getAbsolutePath() + ": " + e.getMessage());
             }
         }
-        File file = new File(dir, "index.html");
-        try {
-            Files.copy(file.toPath(), new File(outDir, file.getName()).toPath(), StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
-            System.err.println("ERROR " + file.getAbsolutePath() + ": " + e.getMessage());
-        }
-        file = new File(dir, "site.css");
+        
+        String index = readFile("index.html");
+        String out = compiler.compile(index).render(model);
+        write(new File(outDir, "index.html"), out);
+        
+        File file = new File(dir, "site.css");
         try {
             Files.copy(file.toPath(), new File(outDir, file.getName()).toPath(), StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
@@ -131,9 +134,10 @@ public class SiteGenApp {
 
     private String markdown2html(String markdown) {
     	markdown = removeComments(markdown);
-    	Parser parser = Parser.builder().build();
+    	List<Extension> extensions = Arrays.asList(TablesExtension.create());
+    	Parser parser = Parser.builder().extensions(extensions).build();
     	Node document = parser.parse(markdown);
-    	HtmlRenderer renderer = HtmlRenderer.builder().build();
+    	HtmlRenderer renderer = HtmlRenderer.builder().extensions(extensions).build();
     	return renderer.render(document);
 	}
     
