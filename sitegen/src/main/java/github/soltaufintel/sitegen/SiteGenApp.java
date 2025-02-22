@@ -59,8 +59,10 @@ public class SiteGenApp {
         }
         
         String index = readFile("index.html");
-        String out = compiler.compile(index).render(model);
-        write(new File(outDir, "index.html"), out);
+        if (index != null) {
+	        String out = compiler.compile(index).render(model);
+	        write(new File(outDir, "index.html"), out);
+        }
         
         File file = new File(dir, "site.css");
         try {
@@ -204,6 +206,9 @@ public class SiteGenApp {
     
     private String readFile(String filename) {
     	File file = new File(dir + "/" + filename);
+    	if (!file.isFile()) {
+    		return null;
+    	}
         try {
             return new String(Files.readAllBytes(file.toPath()));
         } catch (IOException e) {
