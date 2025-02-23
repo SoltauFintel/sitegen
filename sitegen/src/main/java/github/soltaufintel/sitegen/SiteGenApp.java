@@ -65,10 +65,12 @@ public class SiteGenApp {
         }
         
         File file = new File(dir, "site.css");
-        try {
-            Files.copy(file.toPath(), new File(outDir, file.getName()).toPath(), StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
-            System.err.println("ERROR " + file.getAbsolutePath() + ": " + e.getMessage());
+        if (file.isFile()) {
+	        try {
+	            Files.copy(file.toPath(), new File(outDir, file.getName()).toPath(), StandardCopyOption.REPLACE_EXISTING);
+	        } catch (IOException e) {
+	            System.err.println("ERROR " + file.getAbsolutePath() + ": " + e.getMessage());
+	        }
         }
     }
 
