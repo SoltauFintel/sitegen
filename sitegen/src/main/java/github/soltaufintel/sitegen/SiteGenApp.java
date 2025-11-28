@@ -209,7 +209,7 @@ public class SiteGenApp {
     private String readFile(String filename) {
     	File file = new File(dir + "/" + filename);
     	if (!file.isFile()) {
-    		return null;
+    	    throw new RuntimeException("File not found: " + file.getAbsolutePath());
     	}
         try {
             return new String(Files.readAllBytes(file.toPath()));
