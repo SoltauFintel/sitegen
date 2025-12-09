@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -25,6 +26,7 @@ public class SiteGenApp {
     private final String dir;
     private final String outDir;
     private TemplateCompiler compiler;
+    private final List<IndexEntry> indexEntries = new ArrayList<>();
 
     public static void main(String[] args) {
         new SiteGenApp(args[0], args[1]).start();
@@ -49,6 +51,17 @@ public class SiteGenApp {
                 render(file.getName(), model);
             }
         }
+        
+        System.out.println();
+        indexEntries.sort((a, b) -> a.getTitle().compareToIgnoreCase(b.getTitle()));
+        String features = "{{master: master}}\n<h1>Index</h1>\n";
+        for (IndexEntry i : indexEntries) {
+            features += "<a href=\"" + i.getFile() + "\">" + i.getTitle() + "</a><br>\n";
+        }
+        String out = compiler.compile(features).render(model);
+        out = out.replace("LBRACELBRACE", "{{");
+        write(new File(outDir, "features.html"), out);
+        
         new File(outDir, "img").mkdirs();
         for (File file : new File(dir, "img").listFiles()) {
             try {
@@ -60,8 +73,8 @@ public class SiteGenApp {
         
         String index = readFile("index.html");
         if (index != null) {
-	        String out = compiler.compile(index).render(model);
-	        write(new File(outDir, "index.html"), out);
+	        String out2 = compiler.compile(index).render(model);
+	        write(new File(outDir, "index.html"), out2);
         }
         
         File file = new File(dir, "site.css");
@@ -96,7 +109,7 @@ public class SiteGenApp {
     	String html = readFile(filename);
     	String rawHtml = html;
     	if (filename.endsWith(".md")) {
-    		html = "{{master: master}}\n\n" + markdown2html(html);
+    		html = "{{master: master}}\n\n" + markdown2html(html, filename);
     	}
         model.put("title", extractTitle(shortFilename(filename), html));
         model.put("menu", "menu--");
@@ -136,8 +149,29 @@ public class SiteGenApp {
         }
     }
 
-    private String markdown2html(String markdown) {
-    	markdown = removeComments(markdown);
+    private String markdown2html(String markdown, String filename) {
+    	markdown = markdown.replace("\r\n", "\n");
+    	for (String line : markdown.split("\n")) {
+            int o = line.indexOf("<!-- ");
+            int oo = line.indexOf(" -->");
+    	    if (o >= 0 && oo > o) {
+    	        String c = line.substring(o + "<!-- ".length(), oo).trim();
+    	        if ("**".equals(c) && line.startsWith("#")) {
+    	            String a = line.substring(0, o).trim();
+                    while (a.startsWith("#")) {
+                        a = a.substring(1);
+                    }
+                    if (!a.isBlank()) {
+                        indexEntries.add(new IndexEntry(a.trim(), filename.replace(".md", ".html")));
+                    }
+    	        } else if (c.startsWith("K=")) {
+    	            c = c.substring(2).trim();
+    	            if (!c.isEmpty()) {
+    	                indexEntries.add(new IndexEntry(c, filename.replace(".md", ".html")));
+    	            }
+    	        }
+    	    }
+    	}
     	List<Extension> extensions = Arrays.asList(TablesExtension.create());
     	Parser parser = Parser.builder().extensions(extensions).build();
     	Node document = parser.parse(markdown);
@@ -145,13 +179,6 @@ public class SiteGenApp {
     	return renderer.render(document);
 	}
     
-	private String removeComments(String markdown) {
-		String ret = "";
-        for (String line : markdown.replace("\r\n", "\n").split("\n")) {
-            ret += line + "\n";
-		}
-		return ret;
-	}
 	private String shortFilename(String filename) {
 		int o = filename.lastIndexOf(".");
 		if (o >= 0) {
