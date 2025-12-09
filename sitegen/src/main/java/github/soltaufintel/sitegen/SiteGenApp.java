@@ -59,14 +59,18 @@ public class SiteGenApp {
         }
         
         String index = readFile("index.html");
-        String out = compiler.compile(index).render(model);
-        write(new File(outDir, "index.html"), out);
+        if (index != null) {
+	        String out = compiler.compile(index).render(model);
+	        write(new File(outDir, "index.html"), out);
+        }
         
         File file = new File(dir, "site.css");
-        try {
-            Files.copy(file.toPath(), new File(outDir, file.getName()).toPath(), StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
-            System.err.println("ERROR " + file.getAbsolutePath() + ": " + e.getMessage());
+        if (file.isFile()) {
+	        try {
+	            Files.copy(file.toPath(), new File(outDir, file.getName()).toPath(), StandardCopyOption.REPLACE_EXISTING);
+	        } catch (IOException e) {
+	            System.err.println("ERROR " + file.getAbsolutePath() + ": " + e.getMessage());
+	        }
         }
     }
 
@@ -204,6 +208,9 @@ public class SiteGenApp {
     
     private String readFile(String filename) {
     	File file = new File(dir + "/" + filename);
+    	if (!file.isFile()) {
+    	    throw new RuntimeException("File not found: " + file.getAbsolutePath());
+    	}
         try {
             return new String(Files.readAllBytes(file.toPath()));
         } catch (IOException e) {
