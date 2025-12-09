@@ -147,12 +147,10 @@ public class SiteGenApp {
     
 	private String removeComments(String markdown) {
 		String ret = "";
-		for (String line : markdown.replace("\r\n", "\n").split("\n")) {
-			if (!line.startsWith("//")) {
-				ret += line + "\n";
-			}
+        for (String line : markdown.replace("\r\n", "\n").split("\n")) {
+            ret += line + "\n";
 		}
-		return ret.replace("TODO", "<span style=\"color: red; font-weight: bold;\">TODO</span>");
+		return ret;
 	}
 	private String shortFilename(String filename) {
 		int o = filename.lastIndexOf(".");
