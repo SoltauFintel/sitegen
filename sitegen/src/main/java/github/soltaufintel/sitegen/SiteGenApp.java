@@ -110,6 +110,7 @@ public class SiteGenApp {
     	String rawHtml = html;
     	if (filename.endsWith(".md")) {
     		html = "{{master: master}}\n\n" + markdown2html(html, filename);
+    		html = html.replace("<!-- ** -->", "");
     	}
         model.put("title", extractTitle(shortFilename(filename), html));
         model.put("menu", "menu--");
